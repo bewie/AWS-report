@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# original author: Mathieu Lecarme <mathieu@garambrogne.net>
+
 """
 Draw graph from AWS csv report
+
 """
-__author__ = "Mathieu Lecarme <mathieu@garambrogne.net>"
 
 import csv
 from datetime import datetime
@@ -128,6 +130,21 @@ class Report:
 			if not self.filters.has_key(line[0]):
 				self.filters[line[0]] = filters[line[0]]()
 			yield self.filters[line[0]].filter(line)
+
+	def makelist(self, listOp, listUsage):
+	  for line in self.__iter__():
+            if not (line['operation'] in listOp):
+                listOp.append(line['operation'])
+            if not (line['usageType'] in listUsage):
+                listUsage.append(line['usageType'])
+
+	def printlist(self, listOp, listUsage):
+          print "Operation / Type d'utilisation : Nb"
+          for Usage in listUsage:
+            for Op in listOp:
+              S = r.sum(Op, Usage)
+              if ( S > 0) :
+                print "%s/%s : %s" % (Usage, Op, S)
 	def sum(self, action, metric):
 		total = 0.0
 		for line in self.__iter__():
@@ -165,6 +182,8 @@ if __name__ == '__main__':
 	#for line in r:
 	#	print line
 	#print
-	#print 'requests', r.sum('SelectGet', 'Requests')
-	print 'box usage', r.sum('SelectGet', 'BoxUsage')
-	r.draw_all()
+        listOp = []
+        listUsage = []
+        r.makelist(listOp, listUsage)
+        r.printlist(listOp, listUsage)
+	#r.draw_all()
