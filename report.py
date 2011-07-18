@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# original author: Mathieu Lecarme <mathieu@garambrogne.net>
-
 """
 Draw graph from AWS csv report
-
 """
+__author__ = "Mathieu Lecarme <mathieu@garambrogne.net>"
 
 import csv
 from datetime import datetime
@@ -34,12 +32,22 @@ class SDB(object):
 		self.draw_bytes(report)
 
 class S3(object):
+#S3 facturation:
+#Nb requests & Data transfert
+#UE:
+#   POST/PUT/LIST/COPY
+#   GET & Others
+#US:
+#   POST/PUT/LIST/COPY
+#   GET & Others
 	def draw_request(self, report):
-		report.draw('s3_request', ('GetObject', 'Requests-Tier?'), ('PutObject', 'Requests-Tier?'), ('ListBucket', 'Requests-Tier?'), ('HeadObject', 'Requests-Tier?'))
+		report.draw('s3_requests_EU', ('GetObject', 'EU-Requests-Tier?'), ('PutObject', 'EU-Requests-Tier?'), ('ListBucket', 'EU-Requests-Tier?'), ('HeadObject', 'EU-Requests-Tier?'), ('s3_request_sum', '*Requests-Tier?'))
+		report.draw('s3_requests_US', ('GetObject', 'Requests-Tier?'), ('PutObject', 'Requests-Tier?'), ('ListBucket', 'Requests-Tier?'), ('HeadObject', 'Requests-Tier?'))
 	def draw_bytes(self, report):
-		report.draw('s3_bytes', ('GetObject','DataTransfer-Out-Bytes'), ('PutObject','C3DataTransfer-In-Bytes'), ('ListBucket','DataTransfer-Out-Bytes'))
+		report.draw('s3_bytes_EU', ('GetObject','EU-DataTransfer-Out-Bytes'), ('PutObject','EU-C3DataTransfer-In-Bytes'), ('ListBucket','EU-DataTransfer-Out-Bytes'),('s3_bytes_sum','*DataTransfer-*') )
+		report.draw('s3_bytes_US', ('GetObject','DataTransfer-Out-Bytes'), ('PutObject','C3DataTransfer-In-Bytes'), ('ListBucket','DataTransfer-Out-Bytes'))
 	def draw_objects(self, report):
-		report.draw('s3_objects', ('StandardStorage','StorageObjectCount'))
+		report.draw('s3_objects', ('StandardStorage_sum','StorageObjectCount'))
 	def draw_all(self, report):
 		self.draw_request(report)
 		self.draw_bytes(report)
@@ -127,10 +135,10 @@ class Report:
 		r = csv.reader(open(self.f), delimiter=',')
 		r.next()
 		for line in r:
+			#print "DEBUG:%s" % (line[0])
 			if not self.filters.has_key(line[0]):
 				self.filters[line[0]] = filters[line[0]]()
 			yield self.filters[line[0]].filter(line)
-
 	def makelist(self, listOp, listUsage):
 	  for line in self.__iter__():
             if not (line['operation'] in listOp):
@@ -145,6 +153,7 @@ class Report:
               S = r.sum(Op, Usage)
               if ( S > 0) :
                 print "%s/%s : %s" % (Usage, Op, S)
+
 	def sum(self, action, metric):
 		total = 0.0
 		for line in self.__iter__():
@@ -154,14 +163,27 @@ class Report:
 	def draw_all(self):
 		for f in self.filters.values():
 			f.draw_all(self)
+
+
 	def draw(self, title, *filters):
 		data = []
+		print title
 		for filtr in filters:
 			print filtr
 			values = []
 			for line in self:
+                            if not ( fnmatch.fnmatchcase(filtr[0], '*sum*') ):
 				if line['operation'] == filtr[0] and fnmatch.fnmatch(line['usageType'], filtr[1]):
 					values.append([calendar.timegm(line['start'].timetuple()) * 1000, line['value']])
+                            else:
+				if fnmatch.fnmatch(line['usageType'], filtr[1]):
+                                        #make sum 
+                                        if ( values and values[-1][0] == calendar.timegm(line['start'].timetuple()) * 1000 ):
+                                            prev_v = values.pop()[1]
+				            values.append([calendar.timegm(line['start'].timetuple()) * 1000, line['value'] + prev_v])
+                                        else:
+					    values.append([calendar.timegm(line['start'].timetuple()) * 1000, line['value']])
+
 			data.append({
 				'label': ':'.join(filtr),
 				'data': values,
@@ -179,11 +201,16 @@ if __name__ == '__main__':
 	else:
 		rep = sys.argv[1]
 	r = Report(rep)
-	#for line in r:
-	#	print line
-	#print
+
+#debug
+#	l = 0
+#	for line in r:
+#		print "line: %s |%s" % (line,l)
+#		l += 1
+
         listOp = []
         listUsage = []
         r.makelist(listOp, listUsage)
-        r.printlist(listOp, listUsage)
-	#r.draw_all()
+        #r.printlist(listOp, listUsage)
+
+        r.draw_all()
