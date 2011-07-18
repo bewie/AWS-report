@@ -16,9 +16,7 @@
 					position: 'nw'
 				},
 				series: {
-					lines: {
-						show: true
-					}
+					lines: { show: true, fill:true }
 				},
 				xaxis: {
 					mode: "time",
